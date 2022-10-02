@@ -70,6 +70,13 @@ export class Inflator implements IterableIterator<Uint8Array> {
     return this._bs._buf;
   }
 
+  /**
+   * The total number of bytes consumed.
+   */
+  get consumedBytes() {
+    return this._bs.consumedBytes;
+  }
+
   push = (chunk: Uint8Array) => {
     this._bs.push(chunk);
     return this;

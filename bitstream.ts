@@ -18,6 +18,8 @@ export class BitStream {
   _bitOffset = 8;
   _currentByte = 0;
 
+  consumedBytes = 0;
+
   constructor(buf: Uint8Array = new Uint8Array()) {
     this._buf = buf;
   }
@@ -30,6 +32,7 @@ export class BitStream {
     this._currentByte = this._buf[0];
     this._buf = this._buf.slice(1);
     this._bitOffset = 0;
+    this.consumedBytes += 1;
   };
 
   save = (): unknown => ({
