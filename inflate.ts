@@ -62,6 +62,14 @@ export class Inflator implements IterableIterator<Uint8Array> {
     return this._bfinal && this._state.type === endofblock;
   }
 
+  /**
+   * The buffer of prestine bytes in the bitstream. This is useful to get
+   * trailing data that was not part of the deflate stream.
+   */
+  get buf() {
+    return this._bs._buf;
+  }
+
   push = (chunk: Uint8Array) => {
     this._bs.push(chunk);
     return this;
