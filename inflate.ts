@@ -35,6 +35,7 @@ type InflatorState =
 
 export interface InflateOptions {
   windowSize?: number;
+  initialBuffer?: Uint8Array;
 }
 
 // https://www.ietf.org/rfc/rfc1951.txt
@@ -42,12 +43,13 @@ export class Inflator implements IterableIterator<Uint8Array> {
   _closed = false;
   _bfinal = false;
   _state: InflatorState = { type: endofblock };
-  _bs = new BitStream();
+  _bs: BitStream;
 
   _window: Window;
 
   constructor(options: InflateOptions = {}) {
     this._window = new Window(options.windowSize ?? (1 << 15));
+    this._bs = new BitStream(options.initialBuffer);
   }
 
   [Symbol.iterator] = () => this;
