@@ -1,32 +1,5 @@
 import { BitStream, outofdata } from "./bitstream.ts";
 
-export function readFixedCodingSymbol(bs: BitStream): number {
-  const saved = bs.save();
-  try {
-    let symbol = bs.readBits(7);
-    if (symbol <= 0b0010111) {
-      return 256 + symbol;
-    }
-
-    symbol = bs.readBits(1, symbol);
-    if (symbol <= 0b10111111) {
-      return symbol - 48;
-    }
-
-    if (symbol <= 0b11000111) {
-      return symbol + 88;
-    }
-
-    return bs.readBits(1, symbol) - 256;
-  } catch (e) {
-    if (e === outofdata) {
-      bs.restore(saved);
-    }
-
-    throw e;
-  }
-}
-
 export function readCodeWithAdditionalBits(
   bs: BitStream,
   code: number,
@@ -45,23 +18,50 @@ export function readCodeWithAdditionalBits(
     bs.readNumber(additionalBits);
 }
 
-export function readFixedCodingLength(symbol: number, bs: BitStream): number {
-  if (symbol > 284) {
-    return 258;
-  }
+export const fixed = {
+  readSymbol(bs: BitStream): number {
+    const saved = bs.save();
+    try {
+      let symbol = bs.readBits(7);
+      if (symbol <= 0b0010111) {
+        return 256 + symbol;
+      }
 
-  return readCodeWithAdditionalBits(bs, symbol - 257, 4, 7);
-}
+      symbol = bs.readBits(1, symbol);
+      if (symbol <= 0b10111111) {
+        return symbol - 48;
+      }
 
-export function readFixedCodingDistance(bs: BitStream): number {
-  const saved = bs.save();
-  try {
-    return readCodeWithAdditionalBits(bs, bs.readBits(5), 2, 3);
-  } catch (e) {
-    if (e === outofdata) {
-      bs.restore(saved);
+      if (symbol <= 0b11000111) {
+        return symbol + 88;
+      }
+
+      return bs.readBits(1, symbol) - 256;
+    } catch (e) {
+      if (e === outofdata) {
+        bs.restore(saved);
+      }
+
+      throw e;
+    }
+  },
+  readLength(symbol: number, bs: BitStream): number {
+    if (symbol > 284) {
+      return 258;
     }
 
-    throw e;
-  }
-}
+    return readCodeWithAdditionalBits(bs, symbol - 257, 4, 7);
+  },
+  readDistance(bs: BitStream): number {
+    const saved = bs.save();
+    try {
+      return readCodeWithAdditionalBits(bs, bs.readBits(5), 2, 3);
+    } catch (e) {
+      if (e === outofdata) {
+        bs.restore(saved);
+      }
+
+      throw e;
+    }
+  },
+} as const;

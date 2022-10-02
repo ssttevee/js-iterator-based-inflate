@@ -1,11 +1,7 @@
 import { BitStream, outofdata } from "./bitstream.ts";
 import { Window } from "./window.ts";
 import { concat } from "./util.ts";
-import {
-  readFixedCodingDistance,
-  readFixedCodingLength,
-  readFixedCodingSymbol,
-} from "./coding.ts";
+import { fixed } from "./coding.ts";
 
 const endofblock = Symbol();
 const storeblock = Symbol();
@@ -149,7 +145,7 @@ export class Inflator implements IterableIterator<Uint8Array> {
             try {
               while (true) {
                 if (this._state.symbol === undefined) {
-                  const symbol = readFixedCodingSymbol(this._bs);
+                  const symbol = fixed.readSymbol(this._bs);
 
                   if (symbol < 256) {
                     // TODO optimize
@@ -171,7 +167,7 @@ export class Inflator implements IterableIterator<Uint8Array> {
                 }
 
                 if (this._state.length === undefined) {
-                  this._state.length = readFixedCodingLength(
+                  this._state.length = fixed.readLength(
                     this._state.symbol,
                     this._bs,
                   );
@@ -180,7 +176,7 @@ export class Inflator implements IterableIterator<Uint8Array> {
                 value = concat(
                   value,
                   this._window.read(
-                    readFixedCodingDistance(this._bs),
+                    fixed.readDistance(this._bs),
                     this._state.length,
                   ),
                 );
