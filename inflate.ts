@@ -54,6 +54,14 @@ export class Inflator implements IterableIterator<Uint8Array> {
 
   [Symbol.iterator] = () => this;
 
+  /**
+   * The final block has been fully emitted and no more data will be emitted
+   * even if there is additional data in the bitstream.
+   */
+  get done() {
+    return this._bfinal && this._state.type === endofblock;
+  }
+
   push = (chunk: Uint8Array) => {
     this._bs.push(chunk);
     return this;
