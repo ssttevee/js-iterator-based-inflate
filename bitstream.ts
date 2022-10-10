@@ -1,7 +1,6 @@
 import { unreachable } from "https://deno.land/x/unreachable/mod.ts";
 import { concat } from "./util.ts";
-
-export const outofdata = Symbol("out of data");
+import { UnexpectedEndOfStream } from "./errors.ts";
 
 function reverseBits(v: number, size: number): number {
   let result = 0;
@@ -26,7 +25,7 @@ export class BitStream {
 
   _loadNextByte = () => {
     if (this._buf.length === 0) {
-      throw outofdata;
+      throw new UnexpectedEndOfStream();
     }
 
     this._currentByte = this._buf[0];
@@ -58,7 +57,7 @@ export class BitStream {
 
       return result;
     } catch (e) {
-      if (e === outofdata) {
+      if (e instanceof UnexpectedEndOfStream) {
         this.restore(saved);
       }
 
@@ -71,7 +70,7 @@ export class BitStream {
   readUpToNBytes = (n: number) => {
     const available = Math.min(n, this._buf.length);
     if (available === 0) {
-      throw outofdata;
+      throw new UnexpectedEndOfStream();
     }
 
     if (this._bitOffset === 0) {

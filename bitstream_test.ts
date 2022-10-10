@@ -1,8 +1,10 @@
 import {
   assertEquals,
+  assertIsError,
   fail,
 } from "https://deno.land/std@0.158.0/testing/asserts.ts";
-import { BitStream, outofdata } from "./bitstream.ts";
+import { BitStream } from "./bitstream.ts";
+import { UnexpectedEndOfStream } from "./errors.ts";
 
 Deno.test("bitstream", async (t) => {
   const payload = new Uint8Array([0b01110011, 0b01010101]);
@@ -52,7 +54,7 @@ Deno.test("bitstream", async (t) => {
       bs.readBits(1);
       fail("Expected error");
     } catch (e) {
-      assertEquals(e, outofdata);
+      assertIsError(e, UnexpectedEndOfStream);
     }
   });
 
@@ -93,7 +95,7 @@ Deno.test("bitstream", async (t) => {
         bs.readUpToNBytes(1);
         fail("Expected error");
       } catch (e) {
-        assertEquals(e, outofdata);
+        assertIsError(e, UnexpectedEndOfStream);
       }
     });
   });

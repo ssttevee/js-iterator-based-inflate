@@ -1,11 +1,13 @@
-import { BitStream, outofdata } from "./bitstream.ts";
+import { BitStream } from "./bitstream.ts";
+import { UnexpectedEndOfStream } from "./errors.ts";
 import { Window } from "./window.ts";
 import { concat } from "./util.ts";
-import { fixed } from "./coding.ts";
+import * as coding from "./coding.ts";
 
 const endofblock = Symbol();
 const storeblock = Symbol();
 const fixedblock = Symbol();
+const dynamicblock = Symbol();
 
 interface EndOfBlockInflatorState {
   type: typeof endofblock;
@@ -20,14 +22,29 @@ interface StoreBlockInflatorState {
 
 interface FixedBlockInflatorState {
   type: typeof fixedblock;
-  symbol?: number;
+  ll?: number;
   length?: number;
+  code?: {
+    ll: coding.MapMin;
+    dist: coding.MapMin;
+  };
+}
+
+interface DynamicBlockInflatorState {
+  type: typeof dynamicblock;
+  hlit?: number;
+  hdist?: number;
+  hclen?: number;
+  clmap?: coding.MapMin;
+  llmap?: coding.MapMin;
+  distmap?: coding.MapMin;
 }
 
 type InflatorState =
   | EndOfBlockInflatorState
   | StoreBlockInflatorState
-  | FixedBlockInflatorState;
+  | FixedBlockInflatorState
+  | DynamicBlockInflatorState;
 
 export interface InflateOptions {
   windowSize?: number;
@@ -101,7 +118,7 @@ export class Inflator implements IterableIterator<Uint8Array> {
             } else if (btype === 1) {
               this._state = { type: fixedblock };
             } else if (btype === 2) {
-              throw new Error("not implemented");
+              this._state = { type: dynamicblock };
             } else if (btype === 3) {
               throw new Error("invalid btype");
             }
@@ -128,7 +145,7 @@ export class Inflator implements IterableIterator<Uint8Array> {
               this._state.length - this._state.position,
             );
             if (value.length === 0) {
-              throw outofdata;
+              throw new UnexpectedEndOfStream();
             }
 
             this._state.position += value.length;
@@ -144,61 +161,108 @@ export class Inflator implements IterableIterator<Uint8Array> {
             let value = new Uint8Array();
             try {
               while (true) {
-                if (this._state.symbol === undefined) {
-                  const symbol = fixed.readSymbol(this._bs);
-
-                  if (symbol < 256) {
+                if (this._state.ll === undefined) {
+                  const ll = coding.readLiteralOrLength(
+                    this._bs,
+                    this._state.code?.ll || coding.fixed.ll,
+                  );
+                  if (ll < 256) {
                     // TODO optimize
-                    value = concat(value, new Uint8Array([symbol]));
+                    this._window.push(new Uint8Array([ll]));
+                    value = concat(value, new Uint8Array([ll]));
                     continue;
                   }
 
-                  if (symbol === 256) {
+                  if (ll === 256) {
                     this._state = { type: endofblock };
-                    this._window.push(value);
                     return { done: false, value };
                   }
 
-                  if (symbol > 285) {
+                  if (ll > 285) {
                     throw new Error("invalid symbol");
                   }
 
-                  this._state.symbol = symbol;
+                  this._state.ll = ll;
                 }
 
                 if (this._state.length === undefined) {
-                  this._state.length = fixed.readLength(
-                    this._state.symbol,
+                  this._state.length = coding.readAdditionalLengthBits(
                     this._bs,
+                    this._state.ll,
                   );
                 }
 
-                value = concat(
-                  value,
-                  this._window.read(
-                    fixed.readDistance(this._bs),
-                    this._state.length,
+                const bytes = this._window.read(
+                  coding.readDistance(
+                    this._bs,
+                    this._state.code?.dist || coding.fixed.dist,
                   ),
+                  this._state.length,
                 );
+                this._window.push(bytes);
+                value = concat(value, bytes);
 
-                this._state.symbol = undefined;
+                this._state.ll = undefined;
                 this._state.length = undefined;
               }
             } catch (e) {
-              if (e === outofdata && value.length > 0) {
-                this._window.push(value);
-                return { done: false, value };
+              if (e instanceof UnexpectedEndOfStream) {
+                if (value.length > 0) {
+                  return { done: false, value };
+                }
               }
 
               throw e;
             }
           }
+
+          case dynamicblock: {
+            if (this._state.hlit === undefined) {
+              this._state.hlit = this._bs.readNumber(5);
+            }
+
+            if (this._state.hdist === undefined) {
+              this._state.hdist = this._bs.readNumber(5);
+            }
+
+            if (this._state.hclen === undefined) {
+              this._state.hclen = this._bs.readNumber(4);
+            }
+
+            if (this._state.clmap === undefined) {
+              this._state.clmap = coding.readCLMap(this._bs, this._state.hclen);
+            }
+
+            if (this._state.llmap === undefined) {
+              this._state.llmap = coding.readLiteralLengthAlphabet(
+                this._bs,
+                this._state.clmap,
+                this._state.hlit,
+              );
+            }
+
+            if (this._state.distmap === undefined) {
+              this._state.distmap = coding.readDistanceAlphabet(
+                this._bs,
+                this._state.clmap,
+                this._state.hdist,
+              );
+            }
+
+            this._state = {
+              type: fixedblock,
+              code: {
+                ll: this._state.llmap,
+                dist: this._state.distmap,
+              },
+            };
+          }
         }
       }
     } catch (e) {
-      if (e === outofdata) {
+      if (e === UnexpectedEndOfStream) {
         if (this._closed) {
-          throw new Error("unexpected end of stream");
+          throw e;
         }
 
         return { done: true, value: undefined };
