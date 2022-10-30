@@ -265,7 +265,7 @@ export class Inflator implements IterableIterator<Uint8Array> {
         }
       }
     } catch (e) {
-      if (e === UnexpectedEndOfStream) {
+      if (e instanceof UnexpectedEndOfStream) {
         if (this._closed) {
           throw e;
         }
