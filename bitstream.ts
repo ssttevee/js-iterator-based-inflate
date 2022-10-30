@@ -38,6 +38,7 @@ export class BitStream {
     _buf: this._buf,
     _bitOffset: this._bitOffset,
     _currentByte: this._currentByte,
+    consumedBytes: this.consumedBytes,
   });
 
   restore = (state: unknown) => Object.assign(this, state);
