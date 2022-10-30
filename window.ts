@@ -14,7 +14,7 @@ export class Window {
     }
 
     const result = new Uint8Array(length);
-    if (distance <= length) {
+    if (distance >= length) {
       const start = this._end - distance;
       result.set(this._buf.slice(start, start + length));
     } else {
@@ -25,7 +25,7 @@ export class Window {
 
       const remainingBytes = length % distance;
       if (remainingBytes > 0) {
-        result.set(seq.slice(0, length), length - remainingBytes);
+        result.set(seq.slice(0, remainingBytes), length - remainingBytes);
       }
     }
 
