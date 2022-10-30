@@ -141,6 +141,11 @@ export class Inflator implements IterableIterator<Uint8Array> {
               throw new Error("invalid block: len !== ~nlen");
             }
 
+            if (this._state.length <= this._state.position) {
+              this._state = { type: endofblock };
+              continue;
+            }
+
             const value = this._bs.readUpToNBytes(
               this._state.length - this._state.position,
             );
